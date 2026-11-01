@@ -13,6 +13,7 @@ You are making an EchoBridge PR merge-ready: fix failing CI checks, address revi
   cd {{REPO}}
   git fetch origin {{DEFAULT_BRANCH}}
   git merge origin/{{DEFAULT_BRANCH}}
+  node '{{FARMSLOT_DIR}}/projects/echobridge-farm/scripts/project.mjs' setup '{{REPO}}'
   ```
 - [ ] **4. Fetch failing checks and all unresolved comments** (the `## Comment Summary` snapshot in TASK.md is preview only):
   ```bash
@@ -37,11 +38,12 @@ You are making an EchoBridge PR merge-ready: fix failing CI checks, address revi
   git push origin {{BRANCH}}
   ```
 - [ ] **9. Reply to every actionable comment**: inline replies for `review_comment` (`gh api repos/{{GH_REPO}}/pulls/{{PR_NUMBER}}/comments/<ID>/replies -X POST -f body="Fixed in $SHA. …"`, or "Not applicable — …", or "Out of scope for this PR — …"), and one consolidated top-level reply for actionable `issue_comment` findings. Do not double-reply. Failing checks need no reply.
-- [ ] **10. Finalize artifacts**: complete `comments-report.md` (triage, SHA pushed, replies, files changed, validation results including each check rerun locally). Write `{{TASK_DIR}}/artifacts/comments-triage.json` (one entry per comment: `comment_id`, `author_login`, `source_kind`, `path`, `line`, `triage`, `action`, `fixed_in_commit`) and `{{TASK_DIR}}/artifacts/family-scope.json` (`originalFamilyScopeSummary`, `currentTriggerSummary`, `scopeVerdict`, `notes`). Write `artifacts/learnings.md` when at least one REAL finding was fixed.
+- [ ] **10. Finalize artifacts**: complete `comments-report.md` (triage, SHA pushed, replies, files changed, validation results including each check rerun locally). Write `{{TASK_DIR}}/artifacts/comments-triage.json` (one entry per comment: `comment_id`, `author_login`, `source_kind`, `path`, `line`, `triage`, `action`, `fixed_in_commit`) and `{{TASK_DIR}}/artifacts/family-scope.json` (`originalFamilyScopeSummary`, `currentTriggerSummary`, `scopeVerdict`, `notes`). Always write a non-empty `artifacts/learnings.md` (what failed, the cause, and what would have caught it sooner); completion requires it.
 - [ ] **11. Signal**: `{{TASK_DIR}}/mark complete --mark-last`
 
 ## Rules
 
 - Push only `{{BRANCH}}`, with a regular push. Never force-push or rebase. Never merge into the default branch.
 - Inline replies are mandatory for handled review comments.
+- Never edit `.github/workflows/**` or security-scan configuration (`.gitleaksignore`, `docs/open-source/*-ignores.json`, `*-dispositions.json`, `*-overrides.json`): those changes are Arthur's call. If a fix needs one, record the proposed change in `comments-report.md` and mark blocked.
 - Never mention Claude/AI/LLM in commits, replies or PR text. After signaling, **STOP**.
