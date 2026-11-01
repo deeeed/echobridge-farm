@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Forbid pr-complete workers from re-pinning the human-review hashes in `scripts/audit-open-source-readiness.py`; a fix that needs one is recorded and marked blocked.
+
 - Add a pr-complete worker template, so a PR can be made merge-ready through a pr-complete run: fix failing CI checks with the toolchain each workflow pins, address review comments, merge the default branch and push once.
 
 - Select the sole QA profile automatically.

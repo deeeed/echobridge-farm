@@ -45,5 +45,5 @@ You are making an EchoBridge PR merge-ready: fix failing CI checks, address revi
 
 - Push only `{{BRANCH}}`, with a regular push. Never force-push or rebase. Never merge into the default branch.
 - Inline replies are mandatory for handled review comments.
-- Never edit `.github/workflows/**` or security-scan configuration (`.gitleaksignore`, `docs/open-source/*-ignores.json`, `*-dispositions.json`, `*-overrides.json`): those changes are Arthur's call. If a fix needs one, record the proposed change in `comments-report.md` and mark blocked.
+- Never edit `.github/workflows/**`, security-scan configuration (`.gitleaksignore`, `docs/open-source/*-ignores.json`, `*-dispositions.json`, `*-overrides.json`) or the human-review hash pins (`reviewed_hash(...)` in `scripts/audit-open-source-readiness.py`): those changes are Arthur's call. If a fix needs one, record the proposed change in `comments-report.md` and mark blocked.
 - Never mention Claude/AI/LLM in commits, replies or PR text. After signaling, **STOP**.
