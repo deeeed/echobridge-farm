@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a pr-complete worker template, so a PR can be made merge-ready through a pr-complete run: fix failing CI checks with the toolchain each workflow pins, address review comments, merge the default branch and push once.
+
 - Select the sole QA profile automatically.
 
 - Expose a read-only ownership check in the existing Metro helper for prepared-client recipe launch.
