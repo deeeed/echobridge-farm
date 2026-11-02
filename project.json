@@ -165,7 +165,9 @@
   },
   "default_branch": "main",
   "ci": {
-    "local_check": "bash apps/echobridge/.agent/ci-parity"
+    "local_check": "bash apps/echobridge/.agent/ci-parity",
+    "enabled": true,
+    "repo": "deeeed/echobridge_monorepo"
   },
   "vars": {
     "recipe_quality_path": "{{runtime_dir}}/recipe-quality.md",
