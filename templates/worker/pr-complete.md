@@ -27,9 +27,10 @@ You are making an EchoBridge PR merge-ready: fix failing CI checks, address revi
   ```
   For each failing check, read its log (`gh run view <run-id> --repo {{GH_REPO}} --log-failed`). Start `{{TASK_DIR}}/artifacts/comments-report.md` listing every failing check and every actionable comment: source, author, id, file:line, summary, planned action. Skip status-only automation and record how many were skipped.
 - [ ] **5. Triage** each failing check and comment as REAL, FALSE POSITIVE or OUT OF SCOPE after reading the PR diff and the surrounding code.
-- [ ] **6. Apply minimal fixes** for REAL findings. Reproduce a failing check locally with the toolchain its workflow pins (read the workflow; do not rely on whatever version is on PATH), fix the cause rather than the test, and rerun that check until it passes. Regenerate generated files with the repository's own scripts. No unrelated refactors.
-- [ ] **7. Self-review your fixes**: re-read the diff for correctness and `AGENTS.md` rules.
-- [ ] **8. Commit and push once** (skip both when no code changed and the merge in step 3 was a no-op):
+- [ ] **6. Apply minimal fixes** for REAL findings. Read the existing CI failure, fix its cause and use the deterministic mark for validation. Do not launch checks yourself. Regenerate generated files with the repository's own scripts. No unrelated refactors.
+- [ ] **7. Changed-file CI** [DETERMINISTIC: ci.local_check] - call this step through the active checklist mark; read failures and fix them.
+- [ ] **8. Self-review your fixes**: re-read the diff for correctness and `AGENTS.md` rules.
+- [ ] **9. Commit and push once** (skip both when no code changed and the merge in step 3 was a no-op):
   ```bash
   cd {{REPO}}
   git add <intentional-files>
@@ -37,9 +38,9 @@ You are making an EchoBridge PR merge-ready: fix failing CI checks, address revi
   SHA=$(git rev-parse --short HEAD)
   git push origin {{BRANCH}}
   ```
-- [ ] **9. Reply to every actionable comment**: inline replies for `review_comment` (`gh api repos/{{GH_REPO}}/pulls/{{PR_NUMBER}}/comments/<ID>/replies -X POST -f body="Fixed in $SHA. …"`, or "Not applicable — …", or "Out of scope for this PR — …"), and one consolidated top-level reply for actionable `issue_comment` findings. Do not double-reply. Failing checks need no reply.
-- [ ] **10. Finalize artifacts**: complete `comments-report.md` (triage, SHA pushed, replies, files changed, validation results including each check rerun locally). Write `{{TASK_DIR}}/artifacts/comments-triage.json` (one entry per comment: `comment_id`, `author_login`, `source_kind`, `path`, `line`, `triage`, `action`, `fixed_in_commit`) and `{{TASK_DIR}}/artifacts/family-scope.json` (`originalFamilyScopeSummary`, `currentTriggerSummary`, `scopeVerdict`, `notes`). Always write a non-empty `artifacts/learnings.md` (what failed, the cause, and what would have caught it sooner); completion requires it.
-- [ ] **11. Signal**: `{{TASK_DIR}}/mark complete --mark-last`
+- [ ] **10. Reply to every actionable comment**: inline replies for `review_comment` (`gh api repos/{{GH_REPO}}/pulls/{{PR_NUMBER}}/comments/<ID>/replies -X POST -f body="Fixed in $SHA. …"`, or "Not applicable — …", or "Out of scope for this PR — …"), and one consolidated top-level reply for actionable `issue_comment` findings. Do not double-reply. Failing checks need no reply.
+- [ ] **11. Finalize artifacts**: complete `comments-report.md` (triage, SHA pushed, replies, files changed, recorded validation results and receipt paths). Write `{{TASK_DIR}}/artifacts/comments-triage.json` (one entry per comment: `comment_id`, `author_login`, `source_kind`, `path`, `line`, `triage`, `action`, `fixed_in_commit`) and `{{TASK_DIR}}/artifacts/family-scope.json` (`originalFamilyScopeSummary`, `currentTriggerSummary`, `scopeVerdict`, `notes`). Always write a non-empty `artifacts/learnings.md` (what failed, the cause, and what would have caught it sooner); completion requires it.
+- [ ] **12. Signal**: `{{TASK_DIR}}/mark complete --mark-last`
 
 ## Rules
 
