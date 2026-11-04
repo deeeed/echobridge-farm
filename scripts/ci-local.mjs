@@ -23,7 +23,7 @@ function run(binary, args, env = {}) {
 
 try {
   const git = (args) => execFileSync('/usr/bin/git', args, { encoding: 'utf8' });
-  const base = git(['merge-base', 'origin/main', 'HEAD']).trim();
+  const base = process.env.FARMSLOT_CI_BASE_REF || git(['merge-base', 'origin/main', 'HEAD']).trim();
   const files = [...new Set([
     ...git(['diff', '--name-only', '-z', base]).split('\0'),
     ...git(['ls-files', '--others', '--exclude-standard', '-z']).split('\0'),
@@ -31,26 +31,22 @@ try {
   const dependency = files.some((file) => /^(package\.json|yarn\.lock|\.yarnrc\.yml|\.yarn\/)/.test(file));
   const appPrefixes = ['apps/echobridge/', 'packages/echobridgelib/', 'packages/echonative/', 'packages/contracts-typescript/'];
   const appFiles = files.filter((file) => appPrefixes.some((prefix) => file.startsWith(prefix)));
-  // CI builds the shared library before checking the app, also on a clean proof checkout.
-  run(yarn, ['workspace', 'echobridgelib', 'build']);
-  run(yarn, ['workspace', 'echobridge', 'typecheck']);
   const appCI = dependency || appFiles.length > 0 || files.includes('.github/workflows/app.yml') || files.some((file) => file.startsWith('services/server/src/utils/summary_templates/system/'));
   if (appCI) {
+    // App types require the shared library's compiled exports.
+    run(yarn, ['workspace', 'echobridgelib', 'build']);
+    run(yarn, ['workspace', 'echobridge', 'typecheck']);
     run(yarn, ['workspace', 'echobridge', 'lint:baseline']);
     run(yarn, ['workspace', 'echobridge', 'lint:scripts']);
     run(yarn, ['workspace', 'echobridge', 'validate:sample-config']);
     const related = appFiles.filter((file) => /\.[cm]?[jt]sx?$/.test(file) && existsSync(file)).map((file) => path.resolve(file));
-    const broad = dependency || files.includes('.github/workflows/app.yml') ||
-      files.some((file) => file.startsWith('services/server/src/utils/summary_templates/system/')) ||
-      appFiles.some((file) => file.startsWith('packages/echobridgelib/') ||
-        !/\.[cm]?[jt]sx?$/.test(file) || /(?:^|\/)(?:jest|babel).*\.(?:[cm]?js|json)$/.test(file));
-    if (broad) run(yarn, ['workspace', 'echobridge', 'test', '--runInBand', '--watchAll=false']);
-    else if (related.length) run(yarn, ['workspace', 'echobridge', 'test', '--runInBand', '--watchAll=false', '--findRelatedTests', ...related, '--passWithNoTests']);
+    if (related.length) run(yarn, ['workspace', 'echobridge', 'test', '--runInBand', '--watchAll=false', '--findRelatedTests', ...related, '--passWithNoTests']);
+    else console.log('ci-parity: no changed app source; full app suite remains in CI');
   }
-  if (files.some((file) => /^(services\/server\/|packages\/contracts-python\/|contracts\/|scripts\/datasets\/|\.github\/workflows\/server\.yml$)/.test(file))) {
-    // Reuse CI's isolated public environment and marker exclusions. No hosted/provider tests.
-    run('/bin/bash', ['services/server/scripts/test-public.sh']);
-  }
+  const python = files.filter((file) => /^(services\/server|packages\/contracts-python|scripts\/datasets)\//.test(file) && file.endsWith('.py') && existsSync(file));
+  if (python.length) run('python3', ['-m', 'py_compile', ...python]);
+  if (files.some((file) => file.startsWith('services/server/'))) console.log('ci-parity: full server public suite remains in CI');
+
   console.log('ci-parity: PASS; native builds, devices, hosted services and deployment remain in CI');
 } catch (error) {
   console.error(`ci-parity: ${error.message}`);

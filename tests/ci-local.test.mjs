@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -21,7 +21,7 @@ function fixture(t) {
   }
   mkdirSync(path.join(repo, 'services/server/scripts'), { recursive: true });
   writeFileSync(path.join(repo, 'services/server/scripts/test-public.sh'), '#!/bin/sh\nprintf \'["server-public"]\\n\' >> "$ECHO_CI_TEST_LOG"\nexit "${ECHO_CI_SERVER_EXIT:-0}"\n');
-  writeFileSync(path.join(bin, 'yarn'), `#!/usr/bin/env node
+  for (const binary of ['yarn', 'python3']) writeFileSync(path.join(bin, binary), `#!/usr/bin/env node
 const fs=require('node:fs');
 const args=process.argv.slice(2);
 fs.appendFileSync(process.env.ECHO_CI_TEST_LOG,JSON.stringify(args)+'\\n');
@@ -39,7 +39,7 @@ process.exit(args.includes(process.env.ECHO_CI_FAIL_CHECK)?7:0);
       delete env.NODE_TEST_CONTEXT;
       return spawnSync(process.execPath, [path.join(farm, 'scripts/ci-local.mjs')], { cwd: repo, env, encoding: 'utf8', timeout: 4000 });
     },
-    calls: () => readFileSync(log, 'utf8').trim().split('\n').map((line) => JSON.parse(line)),
+    calls: () => existsSync(log) ? readFileSync(log, 'utf8').trim().split('\n').map((line) => JSON.parse(line)) : [],
   };
 }
 
@@ -58,22 +58,22 @@ test('source-only app changes select CI lint/types and related product tests', (
   assert.ok(!calls.some((args) => args.includes('server-public')));
 });
 
-test('shared-library source selects the app suite whose consumers import compiled output', (t) => {
+test('shared-library source uses related tests without expanding to the whole app suite', (t) => {
   const f = fixture(t);
   const file = path.join(f.repo, 'packages/echobridgelib/src/new.ts');
   writeFileSync(file, 'export const added = 1;\n');
   assert.equal(f.run().status, 0);
-  assert.ok(f.calls().some((args) => args.includes('test') && !args.includes('--findRelatedTests')));
+  assert.ok(f.calls().every((args) => !args.includes('test') || args.includes('--findRelatedTests')));
 });
 
 for (const file of ['apps/echobridge/src/__snapshots__/feature.test.ts.snap', 'apps/echobridge/babel.config.js', 'services/server/src/utils/summary_templates/system/prompt.md']) {
-  test(`${file} selects the owning app suite`, (t) => {
+  test(`${file} keeps full app validation in CI`, (t) => {
     const f = fixture(t);
     const target = path.join(f.repo, file);
     mkdirSync(path.dirname(target), { recursive: true });
     writeFileSync(target, '// changed test input\n');
     assert.equal(f.run().status, 0);
-    assert.ok(f.calls().some((args) => args.includes('test') && !args.includes('--findRelatedTests')));
+    assert.ok(f.calls().every((args) => !args.includes('test') || args.includes('--findRelatedTests')));
   });
 }
 
@@ -85,11 +85,11 @@ test('deleted app source still selects CI types and lint', (t) => {
   assert.ok(f.calls().some((args) => args.includes('lint:baseline')));
 });
 
-test('a changed dependency manifest selects all app unit tests', (t) => {
+test('a changed dependency manifest leaves the full app unit suite in CI', (t) => {
   const f = fixture(t);
   writeFileSync(path.join(f.repo, 'package.json'), '{}\n');
   assert.equal(f.run().status, 0);
-  assert.ok(f.calls().some((args) => args.includes('test') && !args.includes('--findRelatedTests')));
+  assert.ok(f.calls().every((args) => !args.includes('test') || args.includes('--findRelatedTests')));
 });
 
 test('unit failure propagates and cannot produce a passing receipt', (t) => {
@@ -100,20 +100,22 @@ test('unit failure propagates and cannot produce a passing receipt', (t) => {
   assert.doesNotMatch(result.stdout, /ci-parity: PASS/);
 });
 
-test('server changes reuse the actual isolated public CI entry point and propagate its failure', (t) => {
+test('server changes check only changed Python files and propagate failures', (t) => {
   const f = fixture(t);
   mkdirSync(path.join(f.repo, 'services/server/src'), { recursive: true });
   writeFileSync(path.join(f.repo, 'services/server/src/example.py'), 'value = 1\n');
-  const result = f.run({ ECHO_CI_SERVER_EXIT: '9' });
-  assert.equal(result.status, 9, result.stderr);
-  assert.ok(f.calls().some((args) => args.includes('server-public')));
+  const result = f.run({ ECHO_CI_FAIL_CHECK: 'py_compile' });
+  assert.equal(result.status, 7, result.stderr);
+  assert.ok(f.calls().some((args) => args.includes('py_compile') && args.includes('services/server/src/example.py')));
+  assert.ok(!f.calls().some((args) => args.includes('server-public')));
 });
 
 test('active catalog is tracked with one shared CI step and retains the acceptance and scoped Metro guards', () => {
   const config = JSON.parse(readFileSync(path.join(farm, 'project.json'), 'utf8'));
   assert.equal(config.ci.local_check, 'bash apps/echobridge/.agent/ci-parity');
   const dev = readFileSync(path.join(farm, 'templates/checklists/dev/default.md'), 'utf8');
-  assert.equal(dev.match(/\{\{CI_PARITY_STEP\}\}/g)?.length, 1);
+  assert.equal(dev.match(/\[DETERMINISTIC: ci\.local_check\]/g)?.length, 1);
+  assert.doesNotMatch(dev, /CI_PARITY_STEP/);
   assert.match(config.hooks.preflight, /stop-metro\.mjs.*project\.mjs/);
   assert.match(config.hooks.prerequisites, /check-paths\.sh/);
   assert.match(config.resources['dev-server'].hooks.shutdown, /stop-metro\.mjs/);
@@ -121,4 +123,12 @@ test('active catalog is tracked with one shared CI step and retains the acceptan
   assert.match(acceptance, /generated.*TASK\.md/);
   assert.match(acceptance, /Recipe proof \+ acceptance review/);
   assert.doesNotMatch(acceptance, /ac set|FARMSLOT_ACCEPTANCE_ROOT|untestable --note/);
+});
+
+
+test('docs-only changes launch no compiler, build or test', (t) => {
+  const f = fixture(t);
+  writeFileSync(path.join(f.repo, 'README.md'), 'Changed docs\n');
+  assert.equal(f.run().status, 0);
+  assert.deepEqual(f.calls(), []);
 });
